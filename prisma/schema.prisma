@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client"            
-  output   = "../src/generated/prisma"  
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -10,6 +10,7 @@ datasource db {
 enum UserRole {
   admin
   user
+  vendor // যদি multi-vendor হয়
 }
 
 enum AccountStatus {
@@ -19,7 +20,6 @@ enum AccountStatus {
   pending_verification
 }
 
-
 enum OTPType {
   email_verification
   login_verification
@@ -27,63 +27,305 @@ enum OTPType {
   two_factor
 }
 
-
-
-model User {
-  id                    String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email                 String           @unique
-  username              String?          @unique
-  firstName             String
-  lastName              String
-  displayName           String?
-  role                  UserRole         @default(user)
-  status                AccountStatus    @default(pending_verification)
-  password              String
-  emailVerifiedAt       DateTime?
-  bio                   String?
-  avatarUrl             String?
-  isDeleted             Boolean          @default(false)
-  lastLoginAt           DateTime?
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @default(now()) @updatedAt
-  deletedAt             DateTime?
-  otps                  OTP[]
+enum OrderStatus {
+  pending
+  confirmed
+  processing
+  shipped
+  delivered
+  cancelled
+  returned
+  refunded
 }
 
+enum PaymentStatus {
+  pending
+  paid
+  failed
+  refunded
+}
+
+enum PaymentMethod {
+  cod
+  bkash
+  nagad
+  rocket
+  stripe
+  paypal
+  card
+}
+
+// ──────────────────────────────────────────────
+// User & Authentication
+// ──────────────────────────────────────────────
+model User {
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email           String        @unique
+  username        String?       @unique
+  firstName       String
+  lastName        String
+  displayName     String?
+  role            UserRole      @default(user)
+  status          AccountStatus @default(pending_verification)
+  password        String // hashed
+  emailVerifiedAt DateTime?
+  phone           String?       @unique
+  bio             String?
+  avatarUrl       String?
+  isDeleted       Boolean       @default(false)
+
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  otps      OTP[]
+  addresses Address[]
+  orders    Order[]
+  wishlist  Wishlist?
+  cart      Cart?
+  reviews   Review[]
+  payments  Payment[]
+
+  @@index([email])
+  @@index([phone])
+}
+
+// ──────────────────────────────────────────────
+// OTP
+// ──────────────────────────────────────────────
 model OTP {
   id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  identifier String
+  identifier String // email or phone
   code       Int
   type       OTPType
   expiresAt  DateTime
   verified   Boolean  @default(false)
   attempts   Int      @default(0)
-  userId     String?  @db.Uuid
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  userId String? @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([identifier, type, verified])
   @@index([expiresAt])
-  @@index([userId])
-  @@index([createdAt])
 }
 
-model Product {
-  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String
-  description String
-  price       Float
-  quantity    Int
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+// ──────────────────────────────────────────────
+// Address (Checkout / Account → Address pages)
+model Address {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String  @db.Uuid
+  fullName     String
+  phone        String
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  zone         String? // e.g. Mirpur, Dhanmondi
+  division     String? // Dhaka, Chittagong etc
+  postalCode   String?
+  isDefault    Boolean @default(false)
+  addressType  String? // home, office, etc
+  country      String  @default("Bangladesh")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[] // shipping address in orders
 }
 
+// ──────────────────────────────────────────────
+// Category & SubCategory
 model Category {
-  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String  @unique
+  slug        String  @unique
   description String?
-  status      String      
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  imageUrl    String?
+  parentId    String? @db.Uuid
+  isActive    Boolean @default(true)
+
+  parent   Category?  @relation("CategoryToSubCategory", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryToSubCategory")
+
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([slug])
+  @@index([parentId])
+}
+
+// ──────────────────────────────────────────────
+// Product (Single Product Page, Shop Page)
+model Product {
+  id               String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String
+  slug             String  @unique
+  description      String  @db.Text
+  shortDescription String? @db.Text
+  price            Float
+  discountPrice    Float? // sale price
+  stock            Int     @default(0)
+  sku              String? @unique
+  images           Json[] // ["url1", "url2"] or separate Image model
+  featuredImage    String?
+  isFeatured       Boolean @default(false)
+  isNewArrival     Boolean @default(false)
+  status           String  @default("active") // active, draft, inactive
+
+  categoryId String?   @db.Uuid
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  reviews       Review[]
+  orderItems    OrderItem[]
+  wishlistItems WishlistItem[]
+  cartItems     CartItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+  @@index([categoryId])
+}
+
+// ──────────────────────────────────────────────
+// Review / Rating (Reviews section)
+model Review {
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String  @db.Uuid
+  productId  String  @db.Uuid
+  rating     Int // 1-5
+  comment    String? @db.Text
+  isApproved Boolean @default(false)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, productId]) // one review per user per product
+}
+
+// ──────────────────────────────────────────────
+// Cart
+model Cart {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @unique @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cartId    String @db.Uuid
+  productId String @db.Uuid
+  quantity  Int    @default(1)
+
+  cart    Cart    @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, productId])
+}
+
+// ──────────────────────────────────────────────
+// Wishlist
+model Wishlist {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @unique @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  items     WishlistItem[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model WishlistItem {
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  wishlistId String @db.Uuid
+  productId  String @db.Uuid
+
+  wishlist Wishlist @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([wishlistId, productId])
+}
+
+// ──────────────────────────────────────────────
+// Order + Order Items (Orders page, Track Order, Confirm Order)
+model Order {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderNumber    String      @unique // e.g. #ORD-2025-0001
+  userId         String      @db.Uuid
+  status         OrderStatus @default(pending)
+  totalAmount    Float
+  discountAmount Float?      @default(0)
+  shippingAmount Float?      @default(0)
+  grandTotal     Float
+
+  shippingAddress   Json? // or relation with Address
+  billingAddress    Json?
+  shippingAddressId String?  @db.Uuid
+  address           Address? @relation(fields: [shippingAddressId], references: [id], onDelete: SetNull)
+
+  paymentMethod PaymentMethod?
+  paymentStatus PaymentStatus  @default(pending)
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items   OrderItem[]
+  payment Payment?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deliveredAt DateTime?
+
+  @@index([userId])
+  @@index([orderNumber])
+}
+
+// Order Items
+model OrderItem {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId   String @db.Uuid
+  productId String @db.Uuid
+  quantity  Int
+  price     Float // price at time of order
+  discount  Float? @default(0)
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+}
+
+// Payment (for non-COD)
+model Payment {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String        @db.Uuid
+  orderId        String        @unique @db.Uuid
+  amount         Float
+  method         PaymentMethod
+  status         PaymentStatus
+  transactionId  String?
+  paymentGateway String? // stripe, bkash etc
+  paidAt         DateTime?
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
