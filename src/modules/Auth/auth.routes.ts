@@ -1,4 +1,3 @@
-// src/modules/Auth/auth.routes.ts
 import { Router, Request, Response } from 'express';
 import { AuthController } from './auth.controller';
 import { validateRequest } from '@/middleware/validation';
@@ -17,148 +16,186 @@ export class AuthRoutes {
     }
 
     private initializeRoutes(): void {
-        // Public routes (no authentication required)
 
-        // Register new user
+        // ── Public routes ──────────────────────────────────────────────────
+
+        /**
+         * POST /api/auth/register
+         * Body: { name, phone, email, password, confirmPassword }
+         */
         this.router.post(
             '/register',
-            validateRequest({
-                body: AuthValidation.register,
-            }),
-            asyncHandler((req: Request, res: Response) => this.authController.register(req, res))
+            validateRequest({ body: AuthValidation.register }),
+            asyncHandler((req: Request, res: Response) =>
+                this.authController.register(req, res)
+            )
         );
 
-        // Login user
+        /**
+         * POST /api/auth/login
+         * Body: { identifier (email OR phone), password, rememberMe? }
+         */
         this.router.post(
             '/login',
-            validateRequest({
-                body: AuthValidation.login,
-            }),
-            asyncHandler((req: Request, res: Response) => this.authController.login(req, res))
+            validateRequest({ body: AuthValidation.login }),
+            asyncHandler((req: Request, res: Response) =>
+                this.authController.login(req, res)
+            )
         );
 
-        // Verify email
+        /**
+         * POST /api/auth/verify-email
+         * Body: { email, code }
+         */
         this.router.post(
             '/verify-email',
-            validateRequest({
-                body: AuthValidation.verifyEmail,
-            }),
-            asyncHandler((req: Request, res: Response) => this.authController.verifyEmail(req, res))
+            validateRequest({ body: AuthValidation.verifyEmail }),
+            asyncHandler((req: Request, res: Response) =>
+                this.authController.verifyEmail(req, res)
+            )
         );
 
-        // Resend email verification
+        /**
+         * POST /api/auth/resend-email-verification
+         * Body: { email }
+         */
         this.router.post(
             '/resend-email-verification',
-            validateRequest({
-                body: AuthValidation.resendEmailVerification,
-            }),
+            validateRequest({ body: AuthValidation.resendEmailVerification }),
             asyncHandler((req: Request, res: Response) =>
                 this.authController.resendEmailVerification(req, res)
             )
         );
 
-        // Forgot password - send reset code
+        /**
+         * POST /api/auth/forgot-password
+         * Body: { email }
+         */
         this.router.post(
             '/forgot-password',
-            validateRequest({
-                body: AuthValidation.forgotPassword,
-            }),
+            validateRequest({ body: AuthValidation.forgotPassword }),
             asyncHandler((req: Request, res: Response) =>
                 this.authController.forgotPassword(req, res)
             )
         );
 
-        // Reset password with OTP
+        /**
+         * POST /api/auth/verify-reset-password-OTP
+         * Body: { email, code }
+         */
         this.router.post(
             '/verify-reset-password-OTP',
-            validateRequest({
-                body: AuthValidation.verifyResetPasswordOTPInput,
-            }),
+            validateRequest({ body: AuthValidation.verifyResetPasswordOTPInput }),
             asyncHandler((req: Request, res: Response) =>
                 this.authController.verifyResetPasswordOTP(req, res)
             )
         );
 
-        // Reset password
+        /**
+         * POST /api/auth/reset-password
+         * Body: { email, newPassword }
+         */
         this.router.post(
             '/reset-password',
-            validateRequest({
-                body: AuthValidation.resetPassword,
-            }),
+            validateRequest({ body: AuthValidation.resetPassword }),
             asyncHandler((req: Request, res: Response) =>
                 this.authController.resetPassword(req, res)
             )
         );
 
-        // Verify token (useful for client-side token validation)
-        this.router.post(
-            '/verify',
-            authenticate,
-            asyncHandler((req: Request, res: Response) => this.authController.verifyToken(req, res))
-        );
-
-        // Refresh token
+        /**
+         * POST /api/auth/refresh
+         * Body: { token? } — also reads from cookie / Authorization header
+         */
         this.router.post(
             '/refresh',
-            validateRequest({
-                body: AuthValidation.refreshToken,
-            }),
+            validateRequest({ body: AuthValidation.refreshToken }),
             asyncHandler((req: Request, res: Response) =>
                 this.authController.refreshToken(req, res)
             )
         );
 
-        // Protected routes (authentication required)
+        // ── Protected routes (JWT required) ───────────────────────────────
 
-        // Get current user profile
+        /**
+         * POST /api/auth/verify
+         * Validates the current token and returns decoded info
+         */
+        this.router.post(
+            '/verify',
+            authenticate,
+            asyncHandler((req: Request, res: Response) =>
+                this.authController.verifyToken(req, res)
+            )
+        );
+
+        /**
+         * GET /api/auth/profile
+         */
         this.router.get(
             '/profile',
             authenticate,
-            asyncHandler((req: Request, res: Response) => this.authController.getProfile(req, res))
+            asyncHandler((req: Request, res: Response) =>
+                this.authController.getProfile(req, res)
+            )
         );
 
-        // Logout user
+        /**
+         * POST /api/auth/logout
+         */
         this.router.post(
             '/logout',
             authenticate,
-            asyncHandler((req: Request, res: Response) => this.authController.logout(req, res))
+            asyncHandler((req: Request, res: Response) =>
+                this.authController.logout(req, res)
+            )
         );
 
-        // Change password
+        /**
+         * POST /api/auth/change-password
+         * Body: { currentPassword, newPassword, confirmNewPassword }
+         */
         this.router.post(
             '/change-password',
             authenticate,
-            validateRequest({
-                body: AuthValidation.changePassword,
-            }),
+            validateRequest({ body: AuthValidation.changePassword }),
             asyncHandler((req: Request, res: Response) =>
                 this.authController.changePassword(req, res)
             )
         );
 
-        // Update profile
+        /**
+         * PATCH /api/auth/update-profile
+         * Body: { firstName?, lastName?, username?, phone?, bio?, avatarUrl? }
+         */
         this.router.patch(
             '/update-profile',
             authenticate,
-            validateRequest({
-                body: AuthValidation.updateProfile,
-            }),
+            validateRequest({ body: AuthValidation.updateProfile }),
             asyncHandler((req: Request, res: Response) =>
                 this.authController.updateProfile(req, res)
             )
         );
 
-        // Admin only routes
+        // ── Admin-only routes ──────────────────────────────────────────────
 
-        // Get all users (admin only)
+        /**
+         * GET /api/auth/users
+         * Query: ?page=1&limit=10
+         */
         this.router.get(
             '/users',
             authenticate,
             authorize('admin'),
-            asyncHandler((req: Request, res: Response) => this.authController.getUsers(req, res))
+            asyncHandler((req: Request, res: Response) =>
+                this.authController.getUsers(req, res)
+            )
         );
 
-        // Update user role (admin only)
+        /**
+         * PUT /api/auth/users/:userId/role
+         * Body: { role }
+         */
         this.router.put(
             '/users/:userId/role',
             authenticate,
@@ -172,7 +209,9 @@ export class AuthRoutes {
             )
         );
 
-        // Get authentication statistics (admin only)
+        /**
+         * GET /api/auth/stats
+         */
         this.router.get(
             '/stats',
             authenticate,

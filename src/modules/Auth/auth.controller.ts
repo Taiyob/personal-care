@@ -1,92 +1,146 @@
-// src/modules/Auth/auth.controller.ts
 import { Request, Response } from 'express';
 import { BaseController } from '@/core/BaseController';
 import { AuthService } from './auth.service';
 import { HTTPStatusCode } from '@/types/HTTPStatusCode';
-import { config } from '@/core/config';
 
 export class AuthController extends BaseController {
     constructor(private authService: AuthService) {
         super();
     }
 
-    /**
-     * Register a new user
-     * POST /api/auth/register
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/auth/register
+    // Body: { name, phone, email, password, confirmPassword }
+    // ─────────────────────────────────────────────────────────────────────────
     public register = async (req: Request, res: Response) => {
         const body = req.validatedBody || req.body;
-        this.logAction('register', req, { email: body.email, role: body.role });
+        this.logAction('register', req, { email: body.email });
 
         const result = await this.authService.register(body);
 
-        return this.sendCreatedResponse(res, result, 'User registered successfully');
+        return this.sendCreatedResponse(res, result, result.message);
     };
 
-    /**
-     * Login user
-     * POST /api/auth/login
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/auth/login
+    // Body: { identifier (email or phone), password, rememberMe? }
+    // ─────────────────────────────────────────────────────────────────────────
     public login = async (req: Request, res: Response) => {
         const body = req.validatedBody || req.body;
-        this.logAction('login', req, { email: body.email });
+        this.logAction('login', req, { identifier: body.identifier });
 
         const result = await this.authService.login(body);
 
-        this.setAuthCookie(res, result.token); // <-- helper used here
+        // Set HTTP-only cookie; extend to 30d if rememberMe
+        const maxAge = body.rememberMe
+            ? 30 * 24 * 60 * 60 * 1000   // 30 days
+            : 7 * 24 * 60 * 60 * 1000;    // 7 days
 
-        return this.sendResponse(res, 'Login successful', HTTPStatusCode.OK, result);
+        res.cookie('auth_token', result.token, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+            maxAge,
+            path: '/',
+        });
+
+        // Separate warning from the main data so clients can surface it
+        const { warning, ...data } = result;
+
+        return this.sendResponse(
+            res,
+            warning ? `Login successful. ${warning}` : 'Login successful',
+            HTTPStatusCode.OK,
+            data
+        );
     };
 
-    /**
-     * Verify email
-     * POST /api/auth/verify-email
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/auth/verify-email
+    // Body: { email, code }
+    // ─────────────────────────────────────────────────────────────────────────
     public verifyEmail = async (req: Request, res: Response) => {
         const body = req.validatedBody || req.body;
         this.logAction('verifyEmail', req, { email: body.email });
 
         const result = await this.authService.verifyEmail(body);
 
-        this.setAuthCookie(res, result.token); // <-- helper used here
+        this.setAuthCookie(res, result.token);
 
-        return this.sendResponse(res, 'Email verification successful', HTTPStatusCode.OK, result);
+        return this.sendResponse(
+            res,
+            'Email verified successfully. You are now logged in.',
+            HTTPStatusCode.OK,
+            result
+        );
     };
 
-    /**
-     * Resend verification email
-     * POST /api/auth/resend-verification-email
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/auth/resend-email-verification
+    // Body: { email }
+    // ─────────────────────────────────────────────────────────────────────────
     public resendEmailVerification = async (req: Request, res: Response) => {
         const body = req.validatedBody || req.body;
         this.logAction('resendEmailVerification', req, { email: body.email });
 
         const result = await this.authService.resendEmailVerification(body);
 
-        return this.sendResponse(
-            res,
-            'Verification email sent successfully',
-            HTTPStatusCode.OK,
-            result
-        );
+        return this.sendResponse(res, result.message, HTTPStatusCode.OK, result);
     };
 
-    /**
-     * Logout user
-     * POST /api/auth/logout
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/auth/forgot-password
+    // Body: { email }
+    // ─────────────────────────────────────────────────────────────────────────
+    public forgotPassword = async (req: Request, res: Response) => {
+        const body = req.validatedBody || req.body;
+        this.logAction('forgotPassword', req, { email: body.email });
+
+        const result = await this.authService.forgotPassword(body);
+
+        return this.sendResponse(res, result.message, HTTPStatusCode.OK, result);
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/auth/verify-reset-password-OTP
+    // Body: { email, code }
+    // ─────────────────────────────────────────────────────────────────────────
+    public verifyResetPasswordOTP = async (req: Request, res: Response) => {
+        const body = req.validatedBody || req.body;
+        this.logAction('verifyResetPasswordOTP', req, { email: body.email });
+
+        const result = await this.authService.verifyResetPasswordOTP(body);
+
+        return this.sendResponse(res, result.message, HTTPStatusCode.OK, result);
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/auth/reset-password
+    // Body: { email, newPassword }
+    // ─────────────────────────────────────────────────────────────────────────
+    public resetPassword = async (req: Request, res: Response) => {
+        const body = req.validatedBody || req.body;
+        this.logAction('resetPassword', req, { email: body.email });
+
+        const result = await this.authService.resetPassword(body);
+
+        return this.sendResponse(res, result.message, HTTPStatusCode.OK, result);
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/auth/logout
+    // ─────────────────────────────────────────────────────────────────────────
     public logout = async (req: Request, res: Response) => {
         this.logAction('logout', req, { userId: this.getUserId(req) });
 
-        this.clearAuthCookie(res); // <-- helper used here
+        this.clearAuthCookie(res);
 
         return this.sendResponse(res, 'Logout successful', HTTPStatusCode.OK);
     };
 
-    /**
-     * Get current user profile
-     * GET /api/auth/profile
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // GET /api/auth/profile
+    // ─────────────────────────────────────────────────────────────────────────
     public getProfile = async (req: Request, res: Response) => {
         const userId = this.getUserId(req);
         if (!userId) {
@@ -100,16 +154,15 @@ export class AuthController extends BaseController {
         return this.sendResponse(res, 'Profile retrieved successfully', HTTPStatusCode.OK, profile);
     };
 
-    /**
-     * Refresh authentication token
-     * POST /api/auth/refresh
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/auth/refresh
+    // ─────────────────────────────────────────────────────────────────────────
     public refreshToken = async (req: Request, res: Response) => {
         const body = req.validatedBody || req.body;
         const currentToken =
             body?.token ||
             req.headers.authorization?.replace('Bearer ', '') ||
-            req.cookies?.auth_token; // <- also check cookie
+            req.cookies?.auth_token;
 
         if (!currentToken) {
             return this.sendResponse(res, 'Token is required', HTTPStatusCode.BAD_REQUEST);
@@ -119,16 +172,14 @@ export class AuthController extends BaseController {
 
         const result = await this.authService.refreshToken(currentToken);
 
-        // Always set new cookie (dev + prod), but secure flags differ
         this.setAuthCookie(res, result.token);
 
         return this.sendResponse(res, 'Token refreshed successfully', HTTPStatusCode.OK, result);
     };
 
-    /**
-     * Change user password
-     * POST /api/auth/change-password
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/auth/change-password
+    // ─────────────────────────────────────────────────────────────────────────
     public changePassword = async (req: Request, res: Response) => {
         const userId = this.getUserId(req);
         if (!userId) {
@@ -144,13 +195,12 @@ export class AuthController extends BaseController {
             body.newPassword
         );
 
-        return this.sendResponse(res, 'Password changed successfully', HTTPStatusCode.OK, result);
+        return this.sendResponse(res, result.message, HTTPStatusCode.OK, result);
     };
 
-    /**
-     * Update user (admin only)
-     * PUT /api/auth/update-profile
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // PATCH /api/auth/update-profile
+    // ─────────────────────────────────────────────────────────────────────────
     public updateProfile = async (req: Request, res: Response) => {
         const userId = this.getUserId(req);
         if (!userId) {
@@ -158,31 +208,29 @@ export class AuthController extends BaseController {
         }
 
         const body = req.validatedBody || req.body;
-        this.logAction('updateUser', req, { userId });
+        this.logAction('updateProfile', req, { userId });
 
         const updatedUser = await this.authService.updateProfile(userId, body);
 
         return this.sendResponse(
             res,
-            'User profile updated successfully',
+            'Profile updated successfully',
             HTTPStatusCode.OK,
             updatedUser
         );
     };
 
-    /**
-     * Update user role (admin only)
-     * PUT /api/auth/users/:userId/role
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // PUT /api/auth/users/:userId/role  (admin only)
+    // ─────────────────────────────────────────────────────────────────────────
     public updateUserRole = async (req: Request, res: Response) => {
         const params = req.validatedParams || req.params;
         const body = req.validatedBody || req.body;
         const { userId } = params;
-        const currentUserId = this.getUserId(req);
 
         this.logAction('updateUserRole', req, {
             targetUserId: userId,
-            currentUserId,
+            currentUserId: this.getUserId(req),
             newRole: body.role,
         });
 
@@ -196,16 +244,14 @@ export class AuthController extends BaseController {
         );
     };
 
-    /**
-     * Verify token validity
-     * POST /api/auth/verify
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // POST /api/auth/verify  (token validity check)
+    // ─────────────────────────────────────────────────────────────────────────
     public verifyToken = async (req: Request, res: Response) => {
         const token =
             req.headers.authorization?.replace('Bearer ', '') ||
-            req.body?.token || // <- safe optional access
-            req.cookies?.auth_token || // <- unified cookie name
-            req.cookies?.token; // <- fallback for old cookie name
+            req.body?.token ||
+            req.cookies?.auth_token;
 
         if (!token) {
             return this.sendResponse(res, 'Token is required', HTTPStatusCode.BAD_REQUEST);
@@ -218,15 +264,13 @@ export class AuthController extends BaseController {
         return this.sendResponse(res, 'Token is valid', HTTPStatusCode.OK, tokenInfo);
     };
 
-    /**
-     * Get all users (admin only) - Updated to use BaseService pagination
-     * GET /api/auth/users
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // GET /api/auth/users  (admin only)
+    // ─────────────────────────────────────────────────────────────────────────
     public getUsers = async (req: Request, res: Response) => {
         const pagination = this.extractPaginationParams(req);
         this.logAction('getUsers', req, { pagination });
 
-        // Use the AuthService method that leverages BaseService pagination
         const result = await this.authService.getUsers(pagination);
 
         return this.sendPaginatedResponse(
@@ -244,10 +288,9 @@ export class AuthController extends BaseController {
         );
     };
 
-    /**
-     * Get user statistics (admin only) - Updated to use AuthService method
-     * GET /api/auth/stats
-     */
+    // ─────────────────────────────────────────────────────────────────────────
+    // GET /api/auth/stats  (admin only)
+    // ─────────────────────────────────────────────────────────────────────────
     public getAuthStats = async (req: Request, res: Response) => {
         this.logAction('getAuthStats', req);
 
@@ -259,54 +302,5 @@ export class AuthController extends BaseController {
             HTTPStatusCode.OK,
             stats
         );
-    };
-
-    /**
-     * Forgot password - send reset code
-     * POST /api/auth/forgot-password
-     */
-    public forgotPassword = async (req: Request, res: Response) => {
-        const body = req.validatedBody || req.body;
-        this.logAction('forgotPassword', req, { email: body.email });
-
-        const result = await this.authService.forgotPassword(body);
-
-        return this.sendResponse(
-            res,
-            'Password reset instructions sent',
-            HTTPStatusCode.OK,
-            result
-        );
-    };
-
-    /**
-     * Verify Reset password with OTP
-     * POST /api/auth/verify-reset-password-OTP
-     */
-    public verifyResetPasswordOTP = async (req: Request, res: Response) => {
-        const body = req.validatedBody || req.body;
-        this.logAction('resetPassword', req, { email: body.email });
-
-        const result = await this.authService.verifyResetPasswordOTP(body);
-
-        return this.sendResponse(
-            res,
-            'Password reset code verified successfully. You can now reset your password.',
-            HTTPStatusCode.OK,
-            result
-        );
-    };
-
-    /**
-     * Reset password with OTP
-     * POST /api/auth/reset-password
-     */
-    public resetPassword = async (req: Request, res: Response) => {
-        const body = req.validatedBody || req.body;
-        this.logAction('resetPassword', req, { email: body.email });
-
-        const result = await this.authService.resetPassword(body);
-
-        return this.sendResponse(res, 'Password reset successfully', HTTPStatusCode.OK, result);
     };
 }
