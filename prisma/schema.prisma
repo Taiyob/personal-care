@@ -10,7 +10,7 @@ datasource db {
 enum UserRole {
   admin
   user
-  vendor // যদি multi-vendor হয়
+  vendor
 }
 
 enum AccountStatus {
@@ -215,13 +215,16 @@ model Review {
 // ──────────────────────────────────────────────
 // Cart
 model Cart {
-  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId String @unique @db.Uuid
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String? @unique @db.Uuid
+  guestCartId String? @unique
+  user        User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   items     CartItem[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+
+  @@index([guestCartId])
 }
 
 model CartItem {
