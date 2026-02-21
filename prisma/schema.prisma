@@ -55,6 +55,13 @@ enum PaymentMethod {
   card
 }
 
+enum ReturnStatus {
+  pending
+  approved
+  rejected
+  completed
+}
+
 // ──────────────────────────────────────────────
 // User & Authentication
 // ──────────────────────────────────────────────
@@ -79,13 +86,14 @@ model User {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  otps      OTP[]
-  addresses Address[]
-  orders    Order[]
-  wishlist  Wishlist?
-  cart      Cart?
-  reviews   Review[]
-  payments  Payment[]
+  otps           OTP[]
+  addresses      Address[]
+  orders         Order[]
+  wishlist       Wishlist?
+  cart           Cart?
+  reviews        Review[]
+  payments       Payment[]
+  returnRequests ReturnRequest[]
 
   @@index([email])
   @@index([phone])
@@ -123,8 +131,8 @@ model Address {
   addressLine1 String
   addressLine2 String?
   city         String
-  zone         String? // e.g. Mirpur, Dhanmondi
-  division     String? // Dhaka, Chittagong etc
+  zone         String?
+  division     String?
   postalCode   String?
   isDefault    Boolean @default(false)
   addressType  String? // home, office, etc
@@ -291,9 +299,17 @@ model Order {
   items   OrderItem[]
   payment Payment?
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deliveredAt DateTime?
+  returnRequests ReturnRequest[]
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  confirmedAt  DateTime?
+  processingAt DateTime? // Packed
+  shippedAt    DateTime?
+  deliveredAt  DateTime?
+  cancelledAt  DateTime?
+  returnedAt   DateTime?
+  refundedAt   DateTime?
 
   @@index([userId])
   @@index([orderNumber])
@@ -331,4 +347,37 @@ model Payment {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ──────────────────────────────────────────────
+// Return Request
+// ──────────────────────────────────────────────
+model ReturnRequest {
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId      String       @db.Uuid
+  userId       String       @db.Uuid
+  reason       String       @db.Text
+  status       ReturnStatus @default(pending)
+  refundAmount Float?       @default(0)
+
+  order Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items ReturnItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([userId])
+}
+
+model ReturnItem {
+  id              String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  returnRequestId String @db.Uuid
+  orderItemId     String @db.Uuid
+  quantity        Int
+
+  returnRequest ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 }

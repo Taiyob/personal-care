@@ -6,6 +6,11 @@ import { CategoryModule } from "./modules/Category/CategoryModule";
 import { ProductModule } from "./modules/Product/ProductModule";
 import { ReviewModule } from "./modules/Review/ReviewModule";
 import { CartModule } from "./modules/Cart/CartModule";
+import { AddressModule } from "./modules/Address/AddressModule";
+import { OrderModule } from "./modules/Order/OrderModule";
+import { WishlistModule } from "./modules/Wishlist/WishlistModule";
+import { ProfileModule } from "./modules/Profile/ProfileModule";
+import { ReturnModule } from "./modules/Return/ReturnModule";
 
 async function bootstrap() {
   try {
@@ -21,6 +26,11 @@ async function bootstrap() {
     app.registerModule(new ProductModule());
     app.registerModule(new ReviewModule());
     app.registerModule(new CartModule());
+    app.registerModule(new AddressModule());
+    app.registerModule(new OrderModule());
+    app.registerModule(new WishlistModule());
+    app.registerModule(new ProfileModule());
+    app.registerModule(new ReturnModule());
 
     AppLogger.info("✔ All modules registered successfully");
 
