@@ -14,6 +14,18 @@ services:
         networks:
             - express_class_template_network
 
+    redis:
+        image: redis:7-alpine
+        container_name: express_class_template_redis
+        restart: unless-stopped
+        command: redis-server --requirepass ${REDIS_PASSWORD:-fiamanillah}
+        ports:
+            - '6380:6379'
+        volumes:
+            - express_class_template_redis_data:/data
+        networks:
+            - express_class_template_network
+
 networks:
     express_class_template_network:
         driver: bridge
@@ -23,3 +35,6 @@ volumes:
     express_class_template_data:
         driver: local
         name: express_class_template_data
+    express_class_template_redis_data:
+        driver: local
+        name: express_class_template_redis_data

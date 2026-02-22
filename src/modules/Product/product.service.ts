@@ -11,6 +11,7 @@ import {
   ProductShopQuery,
   UpdateProductInput,
 } from "./product.validation";
+import { CacheService } from "@/core/CacheService";
 
 // Shared include for product detail (used in single product + list)
 const PRODUCT_LIST_INCLUDE = {
@@ -36,7 +37,7 @@ const PRODUCT_DETAIL_INCLUDE = {
 };
 
 export class ProductService extends BaseService<Product> {
-  constructor(prisma: PrismaClient) {
+  constructor(prisma: PrismaClient, private cache: CacheService) {
     super(prisma, "Product", {
       enableSoftDelete: false,
       enableAuditFields: true,
@@ -71,6 +72,9 @@ export class ProductService extends BaseService<Product> {
     }
 
     const product = await this.create({ ...data, slug });
+
+    // Invalidate product cache
+    await this.cache.delByPattern("products:*");
 
     AppLogger.info("Product created", { id: product.id, name: product.name });
     return product;
@@ -110,6 +114,12 @@ export class ProductService extends BaseService<Product> {
       ...(slug ? { slug } : {}),
     });
 
+    // Invalidate product cache
+    await this.cache.delByPattern("products:*");
+    // Also invalidate specific slug/id just in case delByPattern is async or delayed
+    await this.cache.del(`products:slug:${updated.slug}`);
+    await this.cache.del(`products:id:${id}`);
+
     AppLogger.info("Product updated", { id });
     return updated;
   }
@@ -135,6 +145,12 @@ export class ProductService extends BaseService<Product> {
     }
 
     await this.deleteById(id);
+
+    // Invalidate product cache
+    await this.cache.delByPattern("products:*");
+    await this.cache.del(`products:slug:${product.slug}`);
+    await this.cache.del(`products:id:${id}`);
+
     AppLogger.info("Product deleted", { id, name: product.name });
     return { message: "Product deleted successfully" };
   }
@@ -163,6 +179,15 @@ export class ProductService extends BaseService<Product> {
     const where: any = {
       status: status ?? "active", // public only sees active products
     };
+
+    // Cache Key Strategy: only cache default public shop views
+    const isCacheable = !search && !category && !categoryId && minPrice === undefined && maxPrice === undefined && minRating === undefined && isFeatured === undefined && isNewArrival === undefined && inStock === undefined && status === undefined;
+    const cacheKey = `products:all:p${page}:l${limit}:${sortBy}:${order}`;
+
+    if (isCacheable) {
+      const cached = await this.cache.get<any>(cacheKey);
+      if (cached) return cached;
+    }
 
     // ── Filters ──────────────────────────────────────────────────────
     if (search) {
@@ -232,8 +257,8 @@ export class ProductService extends BaseService<Product> {
       const avgRating =
         ratings.length > 0
           ? parseFloat(
-              (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1),
-            )
+            (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(1),
+          )
           : 0;
 
       const { reviews, ...rest } = p;
@@ -246,7 +271,7 @@ export class ProductService extends BaseService<Product> {
 
     const totalPages = Math.ceil(total / limit);
 
-    return {
+    const result = {
       data: enriched,
       total,
       page,
@@ -255,12 +280,22 @@ export class ProductService extends BaseService<Product> {
       hasNext: page < totalPages,
       hasPrevious: page > 1,
     };
+
+    if (isCacheable) {
+      await this.cache.set(cacheKey, result);
+    }
+
+    return result;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
   // GET SINGLE PRODUCT BY SLUG  (public — single product page)
   // ─────────────────────────────────────────────────────────────────────────
   async getProductBySlug(slug: string) {
+    const cacheKey = `products:slug:${slug}`;
+    const cached = await this.cache.get<any>(cacheKey);
+    if (cached) return cached;
+
     const product = await this.prisma.product.findUnique({
       where: { slug },
       include: PRODUCT_DETAIL_INCLUDE,
@@ -270,7 +305,9 @@ export class ProductService extends BaseService<Product> {
       throw new NotFoundError("Product not found");
     }
 
-    return this.enrichWithRatingSummary(product);
+    const enriched = await this.enrichWithRatingSummary(product);
+    await this.cache.set(cacheKey, enriched);
+    return enriched;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -290,24 +327,38 @@ export class ProductService extends BaseService<Product> {
   // GET FEATURED PRODUCTS  (public — home page "Best Selling / Featured")
   // ─────────────────────────────────────────────────────────────────────────
   async getFeaturedProducts(limit = 8) {
-    return this.prisma.product.findMany({
+    const cacheKey = `products:featured:l${limit}`;
+    const cached = await this.cache.get<any>(cacheKey);
+    if (cached) return cached;
+
+    const products = await this.prisma.product.findMany({
       where: { isFeatured: true, status: "active", stock: { gt: 0 } },
       take: limit,
       orderBy: { createdAt: "desc" },
       include: PRODUCT_LIST_INCLUDE,
     });
+
+    await this.cache.set(cacheKey, products);
+    return products;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
   // GET NEW ARRIVALS  (public — home page)
   // ─────────────────────────────────────────────────────────────────────────
   async getNewArrivals(limit = 8) {
-    return this.prisma.product.findMany({
+    const cacheKey = `products:new_arrivals:l${limit}`;
+    const cached = await this.cache.get<any>(cacheKey);
+    if (cached) return cached;
+
+    const products = await this.prisma.product.findMany({
       where: { isNewArrival: true, status: "active", stock: { gt: 0 } },
       take: limit,
       orderBy: { createdAt: "desc" },
       include: PRODUCT_LIST_INCLUDE,
     });
+
+    await this.cache.set(cacheKey, products);
+    return products;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -330,10 +381,10 @@ export class ProductService extends BaseService<Product> {
         const avgRating =
           ratings.length > 0
             ? parseFloat(
-                (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(
-                  1,
-                ),
-              )
+              (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(
+                1,
+              ),
+            )
             : 0;
         const { reviews, ...rest } = p;
         return { ...rest, avgRating, reviewCount: ratings.length };
@@ -375,6 +426,11 @@ export class ProductService extends BaseService<Product> {
 
     const updated = await this.updateById(id, { stock });
 
+    // Invalidate product cache (stock changes affect listing and details)
+    await this.cache.delByPattern("products:*");
+    await this.cache.del(`products:slug:${product.slug}`);
+    await this.cache.del(`products:id:${id}`);
+
     AppLogger.info("Product stock updated", {
       id,
       oldStock: product.stock,
@@ -402,10 +458,10 @@ export class ProductService extends BaseService<Product> {
     const avgRating =
       totalReviews > 0
         ? parseFloat(
-            (
-              allRatings.reduce((s, r) => s + r.rating, 0) / totalReviews
-            ).toFixed(1),
-          )
+          (
+            allRatings.reduce((s, r) => s + r.rating, 0) / totalReviews
+          ).toFixed(1),
+        )
         : 0;
 
     return {

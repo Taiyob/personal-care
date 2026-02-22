@@ -34,6 +34,11 @@ export const config = {
             max: parseInt(process.env.DB_POOL_MAX || '10'),
         },
     },
+    redis: {
+        url: process.env.REDIS_URL || 'redis://localhost:6379',
+        password: process.env.REDIS_PASSWORD,
+        ttl: parseInt(process.env.REDIS_TTL || '3600'),
+    },
     security: {
         cors: {
             allowedOrigins: process.env.ALLOWED_ORIGINS?.split(',') || ['*'],

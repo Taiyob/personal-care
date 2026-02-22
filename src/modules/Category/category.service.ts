@@ -11,9 +11,10 @@ import {
   CreateCategoryInput,
   UpdateCategoryInput,
 } from "./category.validation";
+import { CacheService } from "@/core/CacheService";
 
 export class CategoryService extends BaseService<Category> {
-  constructor(prisma: PrismaClient) {
+  constructor(prisma: PrismaClient, private cache: CacheService) {
     super(prisma, "Category", {
       enableSoftDelete: false,
       enableAuditFields: true,
@@ -62,6 +63,13 @@ export class CategoryService extends BaseService<Category> {
       id: category.id,
       name: category.name,
     });
+
+    // Invalidate Cache
+    await this.cache.del("categories:all");
+    await this.cache.del("categories:tree");
+    // Cross-module invalidation
+    await this.cache.delByPattern("products:*");
+
     return category;
   }
 
@@ -100,6 +108,14 @@ export class CategoryService extends BaseService<Category> {
       ...(slug ? { slug } : {}),
     });
 
+    // Invalidate Cache
+    await this.cache.del("categories:all");
+    await this.cache.del("categories:tree");
+    await this.cache.del(`categories:slug:${updated.slug}`);
+    await this.cache.del(`categories:id:${id}`);
+    // Cross-module invalidation
+    await this.cache.delByPattern("products:*");
+
     AppLogger.info("Category updated", { id });
     return updated;
   }
@@ -129,6 +145,14 @@ export class CategoryService extends BaseService<Category> {
 
     await this.deleteById(id);
 
+    // Invalidate Cache
+    await this.cache.del("categories:all");
+    await this.cache.del("categories:tree");
+    await this.cache.del(`categories:slug:${category.slug}`);
+    await this.cache.del(`categories:id:${id}`);
+    // Cross-module invalidation
+    await this.cache.delByPattern("products:*");
+
     AppLogger.info("Category deleted", { id, name: category.name });
     return { message: "Category deleted successfully" };
   }
@@ -139,6 +163,15 @@ export class CategoryService extends BaseService<Category> {
   // ─────────────────────────────────────────────────────────────────────────
   async getCategories(query: CategoryListQuery) {
     const { page = 1, limit = 20, parentId, isActive, search } = query;
+
+    // Determine if we can cache this (only for simple listings)
+    const isSimpleListing = !search && parentId === undefined && isActive === undefined;
+    const cacheKey = `categories:all:p${page}:l${limit}`;
+
+    if (isSimpleListing) {
+      const cached = await this.cache.get<any>(cacheKey);
+      if (cached) return cached;
+    }
 
     const where: any = {};
 
@@ -157,7 +190,7 @@ export class CategoryService extends BaseService<Category> {
       where.isActive = isActive;
     }
 
-    return this.findMany(
+    const result = await this.findMany(
       where,
       { page, limit, offset: (page - 1) * limit },
       { name: "asc" },
@@ -169,12 +202,22 @@ export class CategoryService extends BaseService<Category> {
         _count: { select: { products: true } },
       },
     );
+
+    if (isSimpleListing) {
+      await this.cache.set(cacheKey, result);
+    }
+
+    return result;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
   // GET CATEGORY BY SLUG  (public)
   // ─────────────────────────────────────────────────────────────────────────
   async getCategoryBySlug(slug: string) {
+    const cacheKey = `categories:slug:${slug}`;
+    const cached = await this.cache.get<any>(cacheKey);
+    if (cached) return cached;
+
     const category = await this.prisma.category.findUnique({
       where: { slug },
       include: {
@@ -188,6 +231,8 @@ export class CategoryService extends BaseService<Category> {
     });
 
     if (!category) throw new NotFoundError("Category not found");
+
+    await this.cache.set(cacheKey, category);
     return category;
   }
 
@@ -214,6 +259,10 @@ export class CategoryService extends BaseService<Category> {
   // GET TOP-LEVEL CATEGORIES WITH CHILDREN  (public — for home page nav)
   // ─────────────────────────────────────────────────────────────────────────
   async getCategoryTree() {
+    const cacheKey = "categories:tree";
+    const cached = await this.cache.get<any>(cacheKey);
+    if (cached) return cached;
+
     const roots = await this.prisma.category.findMany({
       where: { parentId: null, isActive: true },
       orderBy: { name: "asc" },
@@ -227,6 +276,7 @@ export class CategoryService extends BaseService<Category> {
       },
     });
 
+    await this.cache.set(cacheKey, roots);
     return roots;
   }
 
@@ -238,6 +288,14 @@ export class CategoryService extends BaseService<Category> {
     if (!category) throw new NotFoundError("Category not found");
 
     const updated = await this.updateById(id, { isActive: !category.isActive });
+
+    // Invalidate Cache
+    await this.cache.del("categories:all");
+    await this.cache.del("categories:tree");
+    await this.cache.del(`categories:slug:${updated.slug}`);
+    await this.cache.del(`categories:id:${id}`);
+    // Cross-module invalidation
+    await this.cache.delByPattern("products:*");
 
     AppLogger.info(
       `Category ${updated.isActive ? "activated" : "deactivated"}`,

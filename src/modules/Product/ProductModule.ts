@@ -13,7 +13,7 @@ export class ProductModule extends BaseModule {
   private productRoutes!: ProductRoutes;
 
   protected async setupServices(): Promise<void> {
-    this.productService = new ProductService(this.context.prisma);
+    this.productService = new ProductService(this.context.prisma, this.context.cache);
   }
 
   protected async setupRoutes(): Promise<void> {

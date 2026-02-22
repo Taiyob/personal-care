@@ -13,7 +13,7 @@ export class CategoryModule extends BaseModule {
   private categoryRoutes!: CategoryRoutes;
 
   protected async setupServices(): Promise<void> {
-    this.categoryService = new CategoryService(this.context.prisma);
+    this.categoryService = new CategoryService(this.context.prisma, this.context.cache);
   }
 
   protected async setupRoutes(): Promise<void> {
