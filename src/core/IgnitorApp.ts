@@ -48,13 +48,31 @@ export class IgnitorApp {
         );
 
         // CORS
-        this.app.use(
-            cors({
-                origin: `[${config.security.cors.allowedOrigins}]`,
-                credentials: true,
-                optionsSuccessStatus: 200,
-            })
-        );
+        this.app.use(cors({
+            origin: (origin, callback) => {
+                const allowed = [
+                    'http://localhost:3000',
+                    'http://localhost:3001',
+                ];
+
+                if (!origin || allowed.includes(origin)) {
+                    callback(null, true);
+                } else {
+                    callback(new Error('Not allowed by CORS'));
+                }
+            },
+            methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Authorization'],
+            credentials: true,
+            optionsSuccessStatus: 200
+        }));
+        // this.app.use(
+        //     cors({
+        //         origin: `[${config.security.cors.allowedOrigins}]`,
+        //         credentials: true,
+        //         optionsSuccessStatus: 200,
+        //     })
+        // );
         AppLogger.debug(`CORS enabled for ${config.security.cors.allowedOrigins}`);
         // Cookie parser
         this.app.use(cookieParser());
