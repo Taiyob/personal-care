@@ -53,9 +53,15 @@ export class IgnitorApp {
                 const allowed = [
                     'http://localhost:3000',
                     'http://localhost:3001',
-                ];
+                    'http://localhost:5173',
+                    'http://localhost:5174',
+                    'http://ammazonrose-fronttest-gtzpac-766b66-13-135-112-55.traefik.me',
+                    'https://ammazonrose-fronttest-gtzpac-766b66-13-135-112-55.traefik.me',
+                    config.client?.url
+                ].filter(Boolean);
 
-                if (!origin || allowed.includes(origin)) {
+                // Allow any localhost or traefik.me domains dynamically during testing
+                if (!origin || allowed.includes(origin) || origin.includes('traefik.me') || origin.includes('localhost')) {
                     callback(null, true);
                 } else {
                     callback(new Error('Not allowed by CORS'));

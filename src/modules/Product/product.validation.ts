@@ -32,14 +32,16 @@ export const ProductValidation = {
       price: z.number().positive("Price must be positive"),
       discountPrice: z
         .number()
-        .positive("Discount price must be positive")
+        .min(0, "Discount price must be at least 0")
         .optional()
         .nullable(),
       stock: z.number().int().min(0, "Stock cannot be negative").default(0),
       sku: z.string().max(100).trim().optional(),
+      // Images supplied via MinIO upload (controller injects URL) OR as URL string
       featuredImage: z.string().url("Must be a valid URL").optional(),
       images: z
         .array(z.object({ url: z.string().url(), alt: z.string().optional() }))
+        .optional()
         .default([]),
       isFeatured: z.boolean().default(false),
       isNewArrival: z.boolean().default(false),
@@ -50,7 +52,6 @@ export const ProductValidation = {
         .optional()
         .nullable(),
     })
-    .strict()
     .refine((d) => !d.discountPrice || d.discountPrice < d.price, {
       message: "Discount price must be less than original price",
       path: ["discountPrice"],
@@ -63,7 +64,7 @@ export const ProductValidation = {
       description: z.string().min(10).trim().optional(),
       shortDescription: z.string().max(300).trim().optional(),
       price: z.number().positive().optional(),
-      discountPrice: z.number().positive().optional().nullable(),
+      discountPrice: z.number().min(0).optional().nullable(),
       stock: z.number().int().min(0).optional(),
       sku: z.string().max(100).trim().optional(),
       featuredImage: z.string().url().optional(),

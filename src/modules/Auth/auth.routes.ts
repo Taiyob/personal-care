@@ -4,6 +4,7 @@ import { validateRequest } from '@/middleware/validation';
 import { asyncHandler } from '@/middleware/asyncHandler';
 import { authenticate, authorize } from '@/middleware/auth';
 import { AuthValidation } from './auth.validation';
+import { uploadSingle } from '@/middleware/upload';
 
 export class AuthRoutes {
     private router: Router;
@@ -166,12 +167,13 @@ export class AuthRoutes {
 
         /**
          * PATCH /api/auth/update-profile
-         * Body: { firstName?, lastName?, username?, phone?, bio?, avatarUrl? }
+         * multipart/form-data: { firstName?, lastName?, username?, phone?, bio? }
+         * File: avatar (single image, optional)
          */
         this.router.patch(
             '/update-profile',
             authenticate,
-            validateRequest({ body: AuthValidation.updateProfile }),
+            uploadSingle('avatar'),
             asyncHandler((req: Request, res: Response) =>
                 this.authController.updateProfile(req, res)
             )

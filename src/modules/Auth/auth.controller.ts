@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { BaseController } from '@/core/BaseController';
 import { AuthService } from './auth.service';
 import { HTTPStatusCode } from '@/types/HTTPStatusCode';
+import { MinioService } from '@/services/MinioService';
+import { AuthValidation } from './auth.validation';
 
 export class AuthController extends BaseController {
     constructor(private authService: AuthService) {
@@ -17,6 +19,17 @@ export class AuthController extends BaseController {
         this.logAction('register', req, { email: body.email });
 
         const result = await this.authService.register(body);
+
+        // Set HTTP-only cookie for auto-login
+        if (result.token) {
+            res.cookie('auth_token', result.token, {
+                httpOnly: true,
+                secure: true,
+                sameSite: 'none',
+                maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days default
+                path: '/',
+            });
+        }
 
         return this.sendCreatedResponse(res, result, result.message);
     };
@@ -200,6 +213,7 @@ export class AuthController extends BaseController {
 
     // ─────────────────────────────────────────────────────────────────────────
     // PATCH /api/auth/update-profile
+    // multipart/form-data: text fields + optional avatar file
     // ─────────────────────────────────────────────────────────────────────────
     public updateProfile = async (req: Request, res: Response) => {
         const userId = this.getUserId(req);
@@ -207,8 +221,19 @@ export class AuthController extends BaseController {
             return this.sendResponse(res, 'User not authenticated', HTTPStatusCode.UNAUTHORIZED);
         }
 
-        const body = req.validatedBody || req.body;
+        // Parse body — Zod validation (avatarUrl is optional string URL)
+        const body = AuthValidation.updateProfile.parse(req.body);
         this.logAction('updateProfile', req, { userId });
+
+        // Upload avatar file to MinIO if provided
+        if (req.file) {
+            // Delete old avatar if exists
+            const currentUser = await this.authService.getProfile(userId);
+            if (currentUser.avatarUrl) {
+                await MinioService.deleteFile(currentUser.avatarUrl);
+            }
+            body.avatarUrl = await MinioService.uploadFile('avatars', req.file);
+        }
 
         const updatedUser = await this.authService.updateProfile(userId, body);
 

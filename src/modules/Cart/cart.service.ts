@@ -281,9 +281,16 @@ export class CartService extends BaseService<Cart> {
     });
 
     if (!guestCart || guestCart.items.length === 0) {
+      AppLogger.info("Cart merge: Nothing to merge for guestCartId", { guestCartId, userId });
       // Nothing to merge — just return user's current cart
       return this.getCart(userId);
     }
+
+    AppLogger.info("Cart merge: Starting merge process", {
+      guestCartId,
+      userId,
+      guestItemCount: guestCart.items.length
+    });
 
     // Ensure user cart exists
     let userCart = await this.prisma.cart.findUnique({ where: { userId } });
@@ -294,6 +301,7 @@ export class CartService extends BaseService<Cart> {
     // Merge items inside a transaction
     await this.prisma.$transaction(async (tx) => {
       for (const guestItem of guestCart.items) {
+        AppLogger.info("Cart merge: Processing item", { productId: guestItem.productId, quantity: guestItem.quantity });
         // Skip inactive products
         if (guestItem.product.status !== "active") continue;
 
@@ -354,11 +362,11 @@ export class CartService extends BaseService<Cart> {
       const subtotal = parseFloat((unitPrice * item.quantity).toFixed(2));
       const savings = item.product.discountPrice
         ? parseFloat(
-            (
-              (item.product.price - item.product.discountPrice) *
-              item.quantity
-            ).toFixed(2),
-          )
+          (
+            (item.product.price - item.product.discountPrice) *
+            item.quantity
+          ).toFixed(2),
+        )
         : 0;
 
       return {

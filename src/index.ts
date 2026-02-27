@@ -11,6 +11,7 @@ import { OrderModule } from "./modules/Order/OrderModule";
 import { WishlistModule } from "./modules/Wishlist/WishlistModule";
 import { ProfileModule } from "./modules/Profile/ProfileModule";
 import { ReturnModule } from "./modules/Return/ReturnModule";
+import { PaymentModule } from "./modules/Payment/PaymentModule";
 
 async function bootstrap() {
   try {
@@ -31,6 +32,7 @@ async function bootstrap() {
     app.registerModule(new WishlistModule());
     app.registerModule(new ProfileModule());
     app.registerModule(new ReturnModule());
+    app.registerModule(new PaymentModule());
 
     AppLogger.info("✔ All modules registered successfully");
 

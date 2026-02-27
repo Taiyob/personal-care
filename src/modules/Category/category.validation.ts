@@ -27,8 +27,7 @@ export const CategoryValidation = {
       imageUrl: z.string().url("Must be a valid URL").optional(),
       parentId: z.string().uuid("Parent ID must be a valid UUID").optional(),
       isActive: z.boolean().default(true),
-    })
-    .strict(),
+    }),
 
   update: z
     .object({
@@ -38,8 +37,7 @@ export const CategoryValidation = {
       imageUrl: z.string().url().optional(),
       parentId: z.string().uuid().optional().nullable(),
       isActive: z.boolean().optional(),
-    })
-    .strict(),
+    }),
 
   // Query params for GET /api/categories
   listQuery: z

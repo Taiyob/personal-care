@@ -65,7 +65,7 @@ export class CategoryService extends BaseService<Category> {
     });
 
     // Invalidate Cache
-    await this.cache.del("categories:all");
+    await this.cache.delByPattern("categories:all:*");
     await this.cache.del("categories:tree");
     // Cross-module invalidation
     await this.cache.delByPattern("products:*");
@@ -109,7 +109,7 @@ export class CategoryService extends BaseService<Category> {
     });
 
     // Invalidate Cache
-    await this.cache.del("categories:all");
+    await this.cache.delByPattern("categories:all:*");
     await this.cache.del("categories:tree");
     await this.cache.del(`categories:slug:${updated.slug}`);
     await this.cache.del(`categories:id:${id}`);
@@ -146,7 +146,7 @@ export class CategoryService extends BaseService<Category> {
     await this.deleteById(id);
 
     // Invalidate Cache
-    await this.cache.del("categories:all");
+    await this.cache.delByPattern("categories:all:*");
     await this.cache.del("categories:tree");
     await this.cache.del(`categories:slug:${category.slug}`);
     await this.cache.del(`categories:id:${id}`);
@@ -290,7 +290,7 @@ export class CategoryService extends BaseService<Category> {
     const updated = await this.updateById(id, { isActive: !category.isActive });
 
     // Invalidate Cache
-    await this.cache.del("categories:all");
+    await this.cache.delByPattern("categories:all:*");
     await this.cache.del("categories:tree");
     await this.cache.del(`categories:slug:${updated.slug}`);
     await this.cache.del(`categories:id:${id}`);

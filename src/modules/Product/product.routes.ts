@@ -4,6 +4,13 @@ import { validateRequest } from "@/middleware/validation";
 import { asyncHandler } from "@/middleware/asyncHandler";
 import { authenticate, authorize } from "@/middleware/auth";
 import { ProductValidation } from "./product.validation";
+import { uploadFields } from "@/middleware/upload";
+
+// Multer fields: featuredImage (single) + images (up to 10)
+const productUpload = uploadFields([
+  { name: "featuredImage", maxCount: 1 },
+  { name: "images", maxCount: 10 },
+]);
 
 export class ProductRoutes {
   private router: Router;
@@ -107,13 +114,14 @@ export class ProductRoutes {
 
     /**
      * POST /api/products
-     * Body: { name, description, price, stock, categoryId, ... }
+     * multipart/form-data: { name, description, price, stock, categoryId, ... }
+     * Files: featuredImage (single), images (up to 10)
      */
     this.router.post(
       "/",
       authenticate,
       authorize("admin"),
-      validateRequest({ body: ProductValidation.create }),
+      productUpload,
       asyncHandler((req: Request, res: Response) =>
         this.productController.createProduct(req, res),
       ),
@@ -121,16 +129,14 @@ export class ProductRoutes {
 
     /**
      * PUT /api/products/:id
-     * Body: partial product fields
+     * multipart/form-data: partial product fields
+     * Files: featuredImage (single), images (up to 10)
      */
     this.router.put(
       "/:id",
       authenticate,
       authorize("admin"),
-      validateRequest({
-        params: ProductValidation.params.id,
-        body: ProductValidation.update,
-      }),
+      productUpload,
       asyncHandler((req: Request, res: Response) =>
         this.productController.updateProduct(req, res),
       ),
@@ -138,7 +144,7 @@ export class ProductRoutes {
 
     /**
      * DELETE /api/products/:id
-     * Soft-deletes if product has orders; hard-deletes otherwise
+     * Soft-deletes if product has orders; hard-deletes + removes MinIO images otherwise
      */
     this.router.delete(
       "/:id",

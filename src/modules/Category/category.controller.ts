@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import { BaseController } from "@/core/BaseController";
 import { CategoryService } from "./category.service";
 import { HTTPStatusCode } from "@/types/HTTPStatusCode";
+import { MinioService } from "@/services/MinioService";
+import { CategoryValidation } from "./category.validation";
 
 export class CategoryController extends BaseController {
   constructor(private categoryService: CategoryService) {
@@ -9,33 +11,48 @@ export class CategoryController extends BaseController {
   }
 
   // POST /api/categories  (admin)
+  // multipart/form-data: text fields + optional image file
   public createCategory = async (req: Request, res: Response) => {
-    const body = req.validatedBody || req.body;
+    // Parse boolean from form-data string
+    const rawBody = { ...req.body };
+    if (rawBody.isActive !== undefined)
+      rawBody.isActive = rawBody.isActive === "true" || rawBody.isActive === true;
+
+    const body = CategoryValidation.create.parse(rawBody);
     this.logAction("createCategory", req, { name: body.name });
+
+    // Upload image to MinIO if a file was attached
+    if (req.file) {
+      body.imageUrl = await MinioService.uploadFile("categories", req.file);
+    }
 
     const category = await this.categoryService.createCategory(body);
 
-    return this.sendCreatedResponse(
-      res,
-      category,
-      "Category created successfully",
-    );
+    return this.sendCreatedResponse(res, category, "Category created successfully");
   };
 
   // PUT /api/categories/:id  (admin)
   public updateCategory = async (req: Request, res: Response) => {
-    const { id } = req.validatedParams || req.params;
-    const body = req.validatedBody || req.body;
+    const { id } = req.params;
+    const rawBody = { ...req.body };
+    if (rawBody.isActive !== undefined)
+      rawBody.isActive = rawBody.isActive === "true" || rawBody.isActive === true;
+
+    const body = CategoryValidation.update.parse(rawBody);
     this.logAction("updateCategory", req, { id });
+
+    // Upload new image and delete old one
+    if (req.file) {
+      const old = await this.categoryService.getCategoryById(id);
+      if (old.imageUrl) {
+        await MinioService.deleteFile(old.imageUrl);
+      }
+      body.imageUrl = await MinioService.uploadFile("categories", req.file);
+    }
 
     const category = await this.categoryService.updateCategory(id, body);
 
-    return this.sendResponse(
-      res,
-      "Category updated successfully",
-      HTTPStatusCode.OK,
-      category,
-    );
+    return this.sendResponse(res, "Category updated successfully", HTTPStatusCode.OK, category);
   };
 
   // DELETE /api/categories/:id  (admin)
@@ -43,7 +60,15 @@ export class CategoryController extends BaseController {
     const { id } = req.validatedParams || req.params;
     this.logAction("deleteCategory", req, { id });
 
+    // Fetch before delete to get imageUrl
+    const existing = await this.categoryService.getCategoryById(id);
+
     const result = await this.categoryService.deleteCategory(id);
+
+    // Clean up image from MinIO after successful delete
+    if (existing.imageUrl) {
+      await MinioService.deleteFile(existing.imageUrl);
+    }
 
     return this.sendResponse(res, result.message, HTTPStatusCode.OK);
   };
@@ -73,12 +98,7 @@ export class CategoryController extends BaseController {
   public getCategoryTree = async (req: Request, res: Response) => {
     const tree = await this.categoryService.getCategoryTree();
 
-    return this.sendResponse(
-      res,
-      "Category tree retrieved successfully",
-      HTTPStatusCode.OK,
-      tree,
-    );
+    return this.sendResponse(res, "Category tree retrieved successfully", HTTPStatusCode.OK, tree);
   };
 
   // GET /api/categories/slug/:slug  (public)
@@ -87,12 +107,7 @@ export class CategoryController extends BaseController {
 
     const category = await this.categoryService.getCategoryBySlug(slug);
 
-    return this.sendResponse(
-      res,
-      "Category retrieved successfully",
-      HTTPStatusCode.OK,
-      category,
-    );
+    return this.sendResponse(res, "Category retrieved successfully", HTTPStatusCode.OK, category);
   };
 
   // GET /api/categories/:id  (admin)
@@ -101,12 +116,7 @@ export class CategoryController extends BaseController {
 
     const category = await this.categoryService.getCategoryById(id);
 
-    return this.sendResponse(
-      res,
-      "Category retrieved successfully",
-      HTTPStatusCode.OK,
-      category,
-    );
+    return this.sendResponse(res, "Category retrieved successfully", HTTPStatusCode.OK, category);
   };
 
   // PATCH /api/categories/:id/toggle-active  (admin)

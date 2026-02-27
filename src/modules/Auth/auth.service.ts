@@ -60,8 +60,8 @@ export class AuthService extends BaseService<User> {
     // ─────────────────────────────────────────────────────────────────────────
     async register(
         data: RegisterInput
-    ): Promise<{ message: string; requiresVerification: boolean }> {
-        const { firstName, lastName, name, phone, email, password } = data as any;
+    ): Promise<{ message: string; user: any; token: string; expiresIn: string; requiresVerification: boolean }> {
+        const { firstName, lastName, name, phone, email, password, role } = data as any;
 
         // Check for existing email
         const existingEmail = await this.prisma.user.findUnique({ where: { email } });
@@ -84,30 +84,20 @@ export class AuthService extends BaseService<User> {
             firstName,
             lastName,
             displayName: `${firstName} ${lastName}`,
-            role: UserRole.user,
-            status: AccountStatus.pending_verification,
+            role: role || UserRole.user,
+            status: AccountStatus.active,
+            emailVerifiedAt: new Date(),
         });
 
-        // Send verification OTP (fire-and-forget, don't block response)
-        this.otpService
-            .sendOTP({
-                identifier: email,
-                type: OTPType.email_verification,
-                userId: user.id,
-            })
-            .catch((error) => {
-                AppLogger.error('Failed to send verification email after registration', {
-                    userId: user.id,
-                    email: user.email,
-                    error: error instanceof Error ? error.message : 'Unknown error',
-                });
-            });
+        // Generate auth response for auto-login
+        const authResponse = this.generateAuthResponse(user);
 
         AppLogger.info('User registered successfully', { userId: user.id, email: user.email });
 
         return {
-            message: 'Registration successful. Please check your email for the verification code.',
-            requiresVerification: true,
+            message: 'Registration successful',
+            ...authResponse,
+            requiresVerification: false,
         };
     }
 

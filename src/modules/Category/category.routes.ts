@@ -4,6 +4,7 @@ import { validateRequest } from "@/middleware/validation";
 import { asyncHandler } from "@/middleware/asyncHandler";
 import { authenticate, authorize } from "@/middleware/auth";
 import { CategoryValidation } from "./category.validation";
+import { uploadSingle } from "@/middleware/upload";
 
 export class CategoryRoutes {
   private router: Router;
@@ -68,13 +69,14 @@ export class CategoryRoutes {
 
     /**
      * POST /api/categories
-     * Body: { name, slug?, description?, imageUrl?, parentId?, isActive? }
+     * multipart/form-data: { name, slug?, description?, parentId?, isActive? }
+     * File: image (single, optional)
      */
     this.router.post(
       "/",
       authenticate,
       authorize("admin"),
-      validateRequest({ body: CategoryValidation.create }),
+      uploadSingle("image"),
       asyncHandler((req: Request, res: Response) =>
         this.categoryController.createCategory(req, res),
       ),
@@ -82,16 +84,14 @@ export class CategoryRoutes {
 
     /**
      * PUT /api/categories/:id
-     * Body: partial category fields
+     * multipart/form-data: partial category fields
+     * File: image (single, optional)
      */
     this.router.put(
       "/:id",
       authenticate,
       authorize("admin"),
-      validateRequest({
-        params: CategoryValidation.params.id,
-        body: CategoryValidation.update,
-      }),
+      uploadSingle("image"),
       asyncHandler((req: Request, res: Response) =>
         this.categoryController.updateCategory(req, res),
       ),

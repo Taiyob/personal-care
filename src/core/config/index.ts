@@ -26,6 +26,9 @@ export const config = {
         isTest: process.env.NODE_ENV === 'test',
         requestTimeout: parseInt(process.env.REQUEST_TIMEOUT || '30000'),
     },
+    client: {
+        url: process.env.CLIENT_URL || 'http://localhost:3000',
+    },
     database: {
         url: process.env.DATABASE_URL,
         logging: process.env.DB_LOGGING === 'true',
@@ -94,6 +97,18 @@ export const config = {
         tap_secret_key: process.env.TAP_SECRET_KEY || '',
         tap_webhook_url: process.env.TAP_WEBHOOK_URL || '',
     },
+    minio: {
+        endPoint: process.env.MINIO_ENDPOINT || 'localhost',
+        port: parseInt(process.env.MINIO_PORT || '9000'),
+        useSSL: process.env.MINIO_USE_SSL === 'true',
+        accessKey: process.env.MINIO_ACCESS_KEY || '',
+        secretKey: process.env.MINIO_SECRET_KEY || '',
+        bucketName: (process.env.MINIO_BUCKET_NAME || 'mybucket').replace(/"/g, ''),
+    },
+    stripe: {
+        secretKey: process.env.STRIPE_SECRET_KEY || '',
+        webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
+    }
 };
 
 export default config;
