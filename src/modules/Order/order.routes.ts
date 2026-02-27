@@ -2,7 +2,7 @@ import { Router, Response } from "express";
 import { OrderController } from "./order.controller";
 import { validateRequest } from "@/middleware/validation";
 import { asyncHandler } from "@/middleware/asyncHandler";
-import { authenticate, RequestWithUser } from "@/middleware/auth";
+import { authenticate, authorize, RequestWithUser } from "@/middleware/auth";
 import { OrderValidation } from "./order.validation";
 
 export class OrderRoutes {
@@ -76,6 +76,26 @@ export class OrderRoutes {
             validateRequest({ params: OrderValidation.params.id }),
             asyncHandler((req: RequestWithUser, res: Response) =>
                 this.orderController.getOrderDetails(req, res),
+            ),
+        );
+
+        // --- Admin Routes ---
+        this.router.get(
+            "/admin/all",
+            authenticate,
+            authorize('admin'),
+            asyncHandler((req: RequestWithUser, res: Response) =>
+                this.orderController.getAllOrders(req, res),
+            ),
+        );
+
+        this.router.patch(
+            "/:id/status",
+            authenticate,
+            authorize('admin'),
+            validateRequest({ params: OrderValidation.params.id }),
+            asyncHandler((req: RequestWithUser, res: Response) =>
+                this.orderController.updateOrderStatus(req, res),
             ),
         );
     }

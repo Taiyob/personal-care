@@ -17,6 +17,7 @@ export const ReviewValidation = {
         .max(1000)
         .trim()
         .optional(),
+      images: z.array(z.string()).optional(),
     })
     .strict(),
 
@@ -24,6 +25,7 @@ export const ReviewValidation = {
     .object({
       rating: z.number().int().min(1).max(5).optional(),
       comment: z.string().min(5).max(1000).trim().optional(),
+      images: z.array(z.string()).optional(),
     })
     .strict(),
 
@@ -64,6 +66,15 @@ export const ReviewValidation = {
   },
 };
 
-export type CreateReviewInput = z.infer<typeof ReviewValidation.create>;
-export type UpdateReviewInput = z.infer<typeof ReviewValidation.update>;
+export interface CreateReviewInput {
+  rating: number;
+  comment?: string;
+  images?: string[];
+}
+
+export interface UpdateReviewInput {
+  rating?: number;
+  comment?: string;
+  images?: string[];
+}
 export type ReviewListQuery = z.infer<typeof ReviewValidation.listQuery>;

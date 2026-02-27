@@ -44,8 +44,9 @@ export class AuthModule extends BaseModule {
         this.authRoutes = new AuthRoutes(this.authController);
         // AppLogger.info('AuthRoutes initialized successfully');
 
-        // Mount routes under /api/auth
+        // Mount routes under /api/auth and direct /api/users for convenience
         this.router.use('/api/auth', this.authRoutes.getRouter());
+        this.router.use('/api/users', this.authRoutes.getRouter());
     }
 
     /**

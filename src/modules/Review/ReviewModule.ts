@@ -26,6 +26,12 @@ export class ReviewModule extends BaseModule {
       this.reviewRoutes.getProductRouter(),
     );
 
+    // For /api/reviews/my
+    this.router.get(
+      "/api/reviews/my",
+      this.reviewRoutes.getMyReviewsRouter(),
+    );
+
     // Admin routes: /api/admin/reviews
     this.router.use("/api/admin/reviews", this.reviewRoutes.getAdminRouter());
   }

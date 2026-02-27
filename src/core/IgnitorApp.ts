@@ -57,6 +57,7 @@ export class IgnitorApp {
                     'http://localhost:5174',
                     'http://ammazonrose-fronttest-gtzpac-766b66-13-135-112-55.traefik.me',
                     'https://ammazonrose-fronttest-gtzpac-766b66-13-135-112-55.traefik.me',
+                    'http://ammazonrose-dashboard-4ip9ry-acccd8-13-135-112-55.traefik.me',
                     config.client?.url
                 ].filter(Boolean);
 

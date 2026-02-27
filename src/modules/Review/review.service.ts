@@ -64,6 +64,7 @@ export class ReviewService extends BaseService<Review> {
       productId,
       rating: data.rating,
       comment: data.comment,
+      images: data.images || [],
       isApproved: false, // Admin approves
     });
 
@@ -175,10 +176,10 @@ export class ReviewService extends BaseService<Review> {
     const avgRating =
       totalReviews > 0
         ? parseFloat(
-            (
-              allApproved.reduce((s, r) => s + r.rating, 0) / totalReviews
-            ).toFixed(1),
-          )
+          (
+            allApproved.reduce((s, r) => s + r.rating, 0) / totalReviews
+          ).toFixed(1),
+        )
         : 0;
 
     const totalPages = Math.ceil(total / limit);
@@ -238,5 +239,21 @@ export class ReviewService extends BaseService<Review> {
         },
       },
     );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // GET REVIEWS FOR CURRENT USER  (authenticated)
+  // ─────────────────────────────────────────────────────────────────────────
+  async getMyReviews(userId: string) {
+    const reviews = await this.prisma.review.findMany({
+      where: { userId },
+      include: {
+        product: {
+          select: { id: true, name: true, slug: true, featuredImage: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return reviews;
   }
 }

@@ -457,7 +457,32 @@ export class AuthService extends BaseService<User> {
     // GET USERS (admin) - paginated via BaseService
     // ─────────────────────────────────────────────────────────────────────────
     async getUsers(pagination?: { page: number; limit: number; offset: number }) {
-        return this.findMany({}, pagination, { createdAt: 'desc' });
+        return this.findMany({ isDeleted: false }, pagination, { createdAt: 'desc' });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // DELETE USER (admin)
+    // ─────────────────────────────────────────────────────────────────────────
+    async deleteUser(userId: string): Promise<void> {
+        const user = await this.findById(userId);
+        if (!user) {
+            throw new NotFoundError('User not found');
+        }
+        await this.deleteById(userId);
+        AppLogger.info('User soft deleted', { userId, adminId: 'system' });
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // UPDATE USER STATUS (admin)
+    // ─────────────────────────────────────────────────────────────────────────
+    async updateUserStatus(userId: string, status: AccountStatus): Promise<Omit<User, 'password'>> {
+        const user = await this.findById(userId);
+        if (!user) {
+            throw new NotFoundError('User not found');
+        }
+        const updatedUser = await this.updateById(userId, { status });
+        const { password, ...safeUser } = updatedUser;
+        return safeUser;
     }
 
     // ─────────────────────────────────────────────────────────────────────────

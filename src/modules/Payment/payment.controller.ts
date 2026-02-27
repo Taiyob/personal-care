@@ -19,10 +19,13 @@ export class PaymentController {
 
     stripeWebhook = async (req: Request, res: Response) => {
         const signature = req.headers["stripe-signature"] as string;
-        // In IgnitorApp, raw body is saved to req.rawBody inside json parser 'verify'
-        const rawBody = (req as any).rawBody || req.body;
+        const rawBody = (req as any).rawBody;
 
-        const result = await this.paymentService.handleWebhook(rawBody, signature);
+        if (!rawBody) {
+            console.error("Webhook Error: Raw body not found. Check IgnitorApp JSON parser.");
+        }
+
+        const result = await this.paymentService.handleWebhook(rawBody || req.body, signature);
         res.status(200).json(result);
     }
 

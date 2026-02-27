@@ -222,6 +222,30 @@ export class AuthRoutes {
                 this.authController.getAuthStats(req, res)
             )
         );
+
+        /**
+         * DELETE /api/auth/users/:userId
+         */
+        this.router.delete(
+            '/users/:userId',
+            authenticate,
+            authorize('admin'),
+            asyncHandler((req: Request, res: Response) =>
+                this.authController.deleteUser(req, res)
+            )
+        );
+
+        /**
+         * PATCH /api/auth/users/:userId/status
+         */
+        this.router.patch(
+            '/users/:userId/status',
+            authenticate,
+            authorize('admin'),
+            asyncHandler((req: Request, res: Response) =>
+                this.authController.updateUserStatus(req, res)
+            )
+        );
     }
 
     public getRouter(): Router {

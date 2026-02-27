@@ -137,4 +137,20 @@ export class ReviewController extends BaseController {
       result.data,
     );
   };
+
+  // GET /api/reviews/my  (authenticated)
+  public getMyReviews = async (req: RequestWithUser, res: Response) => {
+    const userId = this.getUserId(req)!;
+
+    this.logAction("getMyReviews", req, { userId });
+
+    const reviews = await this.reviewService.getMyReviews(userId);
+
+    return this.sendResponse(
+      res,
+      "Your reviews retrieved successfully",
+      HTTPStatusCode.OK,
+      reviews,
+    );
+  };
 }

@@ -13,6 +13,11 @@ export class OrderController {
         res.status(HTTPStatusCode.OK).json({ success: true, data: orders });
     }
 
+    async getAllOrders(req: RequestWithUser, res: Response) {
+        const orders = await this.orderService.getAllOrders();
+        res.status(HTTPStatusCode.OK).json({ success: true, data: orders });
+    }
+
     async getMyOrdersByStatus(req: RequestWithUser, res: Response) {
         const userId = req.user!.id;
         const { status } = req.query;
@@ -74,5 +79,21 @@ export class OrderController {
         }
 
         res.status(HTTPStatusCode.OK).json({ success: true, data: order });
+    }
+
+    async updateOrderStatus(req: RequestWithUser, res: Response) {
+        const { id } = req.params;
+        const { status } = req.body;
+
+        if (!status) {
+            throw new AppError(HTTPStatusCode.BAD_REQUEST, "Status is required");
+        }
+
+        const order = await this.orderService.updateOrderStatus(id, status);
+        res.status(HTTPStatusCode.OK).json({
+            success: true,
+            message: `Order status updated to ${status}`,
+            data: order
+        });
     }
 }

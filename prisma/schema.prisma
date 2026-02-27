@@ -209,6 +209,7 @@ model Review {
   productId  String  @db.Uuid
   rating     Int // 1-5
   comment    String? @db.Text
+  images     Json[] // ["url1", "url2"]
   isApproved Boolean @default(false)
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)

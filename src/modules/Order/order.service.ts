@@ -14,6 +14,25 @@ export class OrderService {
         });
     }
 
+    async getAllOrders() {
+        return this.prisma.order.findMany({
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        displayName: true,
+                        email: true,
+                        avatarUrl: true
+                    }
+                },
+                items: { include: { product: true } },
+                address: true,
+                payment: true
+            },
+            orderBy: { createdAt: "desc" },
+        });
+    }
+
     async getOrdersByStatus(userId: string, status: OrderStatus | OrderStatus[]) {
         const statusFilter = Array.isArray(status) ? { in: status } : status;
         return this.prisma.order.findMany({
@@ -196,6 +215,32 @@ export class OrderService {
             }
 
             return updatedOrder;
+        });
+    }
+
+    async updateOrderStatus(id: string, status: OrderStatus) {
+        const order = await this.prisma.order.findUnique({
+            where: { id },
+        });
+
+        if (!order) {
+            throw new AppError(HTTPStatusCode.NOT_FOUND, "Order not found");
+        }
+
+        const data: any = { status };
+
+        // Set timestamps based on status
+        if (status === OrderStatus.confirmed) data.confirmedAt = new Date();
+        if (status === OrderStatus.processing) data.processingAt = new Date();
+        if (status === OrderStatus.shipped) data.shippedAt = new Date();
+        if (status === OrderStatus.delivered) data.deliveredAt = new Date();
+        if (status === OrderStatus.cancelled) data.cancelledAt = new Date();
+        if (status === OrderStatus.returned) data.returnedAt = new Date();
+        if (status === OrderStatus.refunded) data.refundedAt = new Date();
+
+        return this.prisma.order.update({
+            where: { id },
+            data,
         });
     }
 }

@@ -314,6 +314,29 @@ export class AuthController extends BaseController {
     };
 
     // ─────────────────────────────────────────────────────────────────────────
+    // DELETE /api/auth/users/:userId (admin only)
+    // ─────────────────────────────────────────────────────────────────────────
+    public deleteUser = async (req: Request, res: Response) => {
+        const { userId } = req.params;
+        this.logAction('deleteUser', req, { targetUserId: userId });
+
+        await this.authService.deleteUser(userId);
+        return this.sendResponse(res, 'User deleted successfully', HTTPStatusCode.OK);
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PATCH /api/auth/users/:userId/status (admin only)
+    // ─────────────────────────────────────────────────────────────────────────
+    public updateUserStatus = async (req: Request, res: Response) => {
+        const { userId } = req.params;
+        const { status } = req.body;
+        this.logAction('updateUserStatus', req, { targetUserId: userId, status });
+
+        const updatedUser = await this.authService.updateUserStatus(userId, status);
+        return this.sendResponse(res, 'User status updated successfully', HTTPStatusCode.OK, updatedUser);
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
     // GET /api/auth/stats  (admin only)
     // ─────────────────────────────────────────────────────────────────────────
     public getAuthStats = async (req: Request, res: Response) => {

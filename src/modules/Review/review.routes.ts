@@ -119,4 +119,16 @@ export class ReviewRoutes {
   public getAdminRouter(): Router {
     return this.adminRouter;
   }
+
+  public getMyReviewsRouter(): Router {
+    const router = Router();
+    router.get(
+      "/",
+      authenticate,
+      asyncHandler((req: Request, res: Response) =>
+        this.reviewController.getMyReviews(req, res),
+      ),
+    );
+    return router;
+  }
 }
