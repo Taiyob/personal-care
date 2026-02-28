@@ -326,7 +326,7 @@ export class ProductService extends BaseService<Product> {
   // ─────────────────────────────────────────────────────────────────────────
   // GET FEATURED PRODUCTS  (public — home page "Best Selling / Featured")
   // ─────────────────────────────────────────────────────────────────────────
-  async getFeaturedProducts(limit = 8) {
+  async getFeaturedProducts(limit = 4) {
     const cacheKey = `products:featured:l${limit}`;
     const cached = await this.cache.get<any>(cacheKey);
     if (cached) return cached;
@@ -365,14 +365,15 @@ export class ProductService extends BaseService<Product> {
   // GET TOP RATED PRODUCTS  (public — home page "Top Rated Product")
   // ─────────────────────────────────────────────────────────────────────────
   async getTopRatedProducts(limit = 8) {
-    // Fetch more, then sort by computed avg rating
+    // Fetch more, then sort by computed avg rating & recency
     const products = await this.prisma.product.findMany({
       where: { status: "active", stock: { gt: 0 } },
-      take: limit * 3, // fetch extra to sort & trim
+      take: 50, // Fetch a larger pool to find top rated ones
       include: {
         ...PRODUCT_LIST_INCLUDE,
         reviews: { where: { isApproved: true }, select: { rating: true } },
       },
+      orderBy: { createdAt: "desc" },
     });
 
     return products
@@ -390,7 +391,11 @@ export class ProductService extends BaseService<Product> {
         return { ...rest, avgRating, reviewCount: ratings.length };
       })
       .filter((p) => p.reviewCount > 0)
-      .sort((a, b) => b.avgRating - a.avgRating)
+      .sort((a, b) => {
+        // Prioritize rating, then recency
+        if (b.avgRating !== a.avgRating) return b.avgRating - a.avgRating;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      })
       .slice(0, limit);
   }
 

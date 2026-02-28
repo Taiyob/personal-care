@@ -27,7 +27,7 @@ export class ReviewModule extends BaseModule {
     );
 
     // For /api/reviews/my
-    this.router.get(
+    this.router.use(
       "/api/reviews/my",
       this.reviewRoutes.getMyReviewsRouter(),
     );

@@ -233,7 +233,13 @@ export class OrderService {
         if (status === OrderStatus.confirmed) data.confirmedAt = new Date();
         if (status === OrderStatus.processing) data.processingAt = new Date();
         if (status === OrderStatus.shipped) data.shippedAt = new Date();
-        if (status === OrderStatus.delivered) data.deliveredAt = new Date();
+        if (status === OrderStatus.delivered) {
+            data.deliveredAt = new Date();
+            // Automatically mark as PAID if it's COD
+            if (order.paymentMethod === PaymentMethod.cod) {
+                data.paymentStatus = PaymentStatus.paid;
+            }
+        }
         if (status === OrderStatus.cancelled) data.cancelledAt = new Date();
         if (status === OrderStatus.returned) data.returnedAt = new Date();
         if (status === OrderStatus.refunded) data.refundedAt = new Date();
